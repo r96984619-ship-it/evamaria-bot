@@ -29,9 +29,11 @@ def setup_logging():
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    sh = logging.StreamHandler()
-    sh.setFormatter(fmt)
-    root.addHandler(sh)
+    # Only add handlers if none exist yet (main.py may have set one up already)
+    if not root.handlers:
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
+        root.addHandler(sh)
 
     fh = logging.handlers.RotatingFileHandler("bot.log", maxBytes=5 * 1024 * 1024, backupCount=2)
     fh.setFormatter(fmt)
@@ -56,6 +58,7 @@ class Bot(Client):
     async def start(self):
         setup_logging()
         logger.info("Starting EvaMariaBot...")
+        logger.info("API_ID: %s | BOT_TOKEN prefix: %s", Var.API_ID, Var.BOT_TOKEN[:10] + "..." if Var.BOT_TOKEN else "MISSING")
 
         # Connect to database
         await connect_db(Var.DATABASE_URI, Var.DATABASE_NAME)
@@ -68,33 +71,44 @@ class Bot(Client):
             await super().start()
         except AccessTokenInvalid:
             logger.critical(
-                "BOT_TOKEN is invalid. Go to @BotFather on Telegram, copy the "
-                "token for your bot, and update the BOT_TOKEN variable in "
-                "Railway → Variables. Then redeploy."
+                "BOT_TOKEN is invalid — Telegram rejected it.\n"
+                "  → Open @BotFather on Telegram\n"
+                "  → Find your bot, use /token to get the current token\n"
+                "  → Copy it exactly and update BOT_TOKEN in Railway → Variables\n"
+                "  → Redeploy"
             )
             raise
         except AccessTokenExpired:
             logger.critical(
-                "BOT_TOKEN has been revoked. Open @BotFather, use /revoke on "
-                "your bot to generate a new token, update BOT_TOKEN in Railway, "
-                "then redeploy."
+                "BOT_TOKEN has been revoked by Telegram.\n"
+                "  → Open @BotFather → /mybots → your bot → API Token → Revoke\n"
+                "  → Copy the new token and update BOT_TOKEN in Railway → Variables\n"
+                "  → Redeploy"
             )
             raise
         except ApiIdInvalid:
             logger.critical(
-                "API_ID or API_HASH is wrong. Visit https://my.telegram.org/apps "
-                "to get your correct credentials and update them in Railway → Variables."
+                "API_ID or API_HASH is wrong.\n"
+                "  → Visit https://my.telegram.org/apps\n"
+                "  → Copy your App api_id and api_hash\n"
+                "  → Update API_ID and API_HASH in Railway → Variables\n"
+                "  → Redeploy"
             )
             raise
         except AuthKeyUnregistered:
             logger.critical(
-                "Auth key unregistered — the session was invalidated by Telegram. "
-                "This is automatically handled with in_memory=True. If this error "
-                "persists, verify your API_ID / API_HASH at https://my.telegram.org/apps."
+                "Auth key was invalidated by Telegram (should not happen with in_memory=True).\n"
+                "  → Verify API_ID and API_HASH at https://my.telegram.org/apps\n"
+                "  → Redeploy"
             )
             raise
 
-        me = await self.get_me()
+        try:
+            me = await self.get_me()
+        except Exception as e:
+            logger.critical("get_me() failed after successful auth — unexpected error: %s", e)
+            raise
+
         # Patch BOT_USERNAME at runtime
         Var.BOT_USERNAME = me.username or Var.BOT_USERNAME
         logger.info("Bot started as @%s (ID: %s)", me.username, me.id)
