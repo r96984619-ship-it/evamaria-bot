@@ -1,0 +1,21 @@
+# Railway Environment Variables
+# Copy these into your Railway project Variables tab
+
+DATABASE_URI=mongodb+srv://zedkhan29:<db_kiM1Nb6r098B4Cnr>@cluster0.jetkskj.mongodb.net/?appName=Cluster0
+DATABASE_NAME=EvaMaria
+BOT_NAME=EvaMariaBot
+PROTECT_CONTENT=false
+SPELL_CHECK_REPLY=false
+MAX_LIST_ELM=50
+PM_MODE=false
+SINGLE_BUTTON=false
+
+# You still need to set manually:
+# BOT_TOKEN=<from @BotFather>
+# API_ID=<from my.telegram.org>
+# API_HASH=<from my.telegram.org>
+# ADMINS=<your Telegram user ID>
+# BOT_USERNAME=<your bot username without @>
+# CHANNELS=<space-separated channel IDs to auto-index>
+# LOG_CHANNEL=<channel ID for logs, optional>
+# AUTH_CHANNEL=<channel users must join, 0 to disable>
