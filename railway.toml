@@ -3,5 +3,7 @@ builder = "dockerfile"
 
 [deploy]
 startCommand = "python main.py"
+# Reduced retries + longer gap so Railway doesn't hammer Telegram auth
+# and trigger FloodWait bans on repeated crash-restart cycles.
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10
+restartPolicyMaxRetries = 3
