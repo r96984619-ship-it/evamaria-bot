@@ -1,7 +1,6 @@
 # Railway Environment Variables
 # Paste each of these into Railway → your project → Variables tab
 
-DATABASE_URI=mongodb+srv://zedkhan29:azizthekiller521@cluster0.jetkskj.mongodb.net/?appName=Cluster0
 DATABASE_NAME=EvaMaria
 BOT_NAME=EvaMariaBot
 PROTECT_CONTENT=false
@@ -11,6 +10,7 @@ PM_MODE=false
 SINGLE_BUTTON=false
 
 # Set these manually (specific to your bot):
+# DATABASE_URI=<your MongoDB connection string from MongoDB Atlas>
 # BOT_TOKEN=<from @BotFather>
 # API_ID=<from my.telegram.org/apps>
 # API_HASH=<from my.telegram.org/apps>
