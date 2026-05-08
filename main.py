@@ -43,7 +43,16 @@ async def main():
     # correctly on Python 3.10+ (avoids 'no current event loop' RuntimeError)
     from bot import Bot
     bot = Bot()
-    await bot.start()
+
+    try:
+        await bot.start()
+    except Exception as e:
+        # bot/__init__.py already logs a descriptive critical message for known
+        # Pyrogram auth errors (AccessTokenInvalid, AccessTokenExpired, etc.).
+        # Re-raise so Railway marks the deploy as failed and shows the logs.
+        print(f"[FATAL] Bot failed to start: {type(e).__name__}: {e}")
+        print("        Check the error message above for fix instructions.")
+        sys.exit(1)
 
     logger.info("EvaMariaBot is running. Press Ctrl+C to stop.")
     try:
