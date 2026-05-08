@@ -2,7 +2,13 @@ import logging
 import logging.handlers
 import os
 from pyrogram import Client
-from pyrogram.errors import FloodWait
+from pyrogram.errors import (
+    FloodWait,
+    AccessTokenInvalid,
+    AccessTokenExpired,
+    ApiIdInvalid,
+    AuthKeyUnregistered,
+)
 import asyncio
 
 from bot.config import Var
@@ -41,6 +47,10 @@ class Bot(Client):
             bot_token=Var.BOT_TOKEN,
             plugins=dict(root="bot/plugins"),
             sleep_threshold=60,
+            # in_memory=True avoids SQLite session files on Railway's ephemeral
+            # filesystem. Each restart does a fresh Telegram auth — correct for
+            # containerised/serverless deployments where the disk resets.
+            in_memory=True,
         )
 
     async def start(self):
@@ -54,7 +64,35 @@ class Bot(Client):
         if Var.START_IMG_URL:
             utils.START_IMGS.extend(Var.START_IMG_URL)
 
-        await super().start()
+        try:
+            await super().start()
+        except AccessTokenInvalid:
+            logger.critical(
+                "BOT_TOKEN is invalid. Go to @BotFather on Telegram, copy the "
+                "token for your bot, and update the BOT_TOKEN variable in "
+                "Railway → Variables. Then redeploy."
+            )
+            raise
+        except AccessTokenExpired:
+            logger.critical(
+                "BOT_TOKEN has been revoked. Open @BotFather, use /revoke on "
+                "your bot to generate a new token, update BOT_TOKEN in Railway, "
+                "then redeploy."
+            )
+            raise
+        except ApiIdInvalid:
+            logger.critical(
+                "API_ID or API_HASH is wrong. Visit https://my.telegram.org/apps "
+                "to get your correct credentials and update them in Railway → Variables."
+            )
+            raise
+        except AuthKeyUnregistered:
+            logger.critical(
+                "Auth key unregistered — the session was invalidated by Telegram. "
+                "This is automatically handled with in_memory=True. If this error "
+                "persists, verify your API_ID / API_HASH at https://my.telegram.org/apps."
+            )
+            raise
 
         me = await self.get_me()
         # Patch BOT_USERNAME at runtime
