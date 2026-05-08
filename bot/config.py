@@ -40,9 +40,10 @@ class Var:
     ADMINS = _parse_ints("ADMINS")
     CHANNELS = _parse_ints("CHANNELS")              # channels to auto-index
 
-    # Bot identity
+    # Bot identity — strip leading @ so URLs like https://t.me/{BOT_USERNAME}
+    # work correctly whether the user sets "MyBot" or "@MyBot" in Railway.
     BOT_NAME = environ.get("BOT_NAME", "EvaMariaBot")
-    BOT_USERNAME = environ.get("BOT_USERNAME", "")
+    BOT_USERNAME = environ.get("BOT_USERNAME", "").lstrip("@")
 
     # Start images (rotating)
     START_IMG_URL = environ.get("START_IMG_URL", "").split()
