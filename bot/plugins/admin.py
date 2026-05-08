@@ -12,8 +12,8 @@ from bot.database import (
     ban_user, is_banned, add_user,
     disable_chat, is_chat_disabled,
     delete_all_files,
-    broadcast_messages,
 )
+from bot.utils import broadcast_messages
 
 logger = logging.getLogger(__name__)
 
