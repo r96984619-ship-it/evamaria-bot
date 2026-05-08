@@ -66,37 +66,59 @@ ABOUT_TEXT = (
     "indexing, and delivering files from channels and groups."
 )
 
+
 def start_keyboard(is_group: bool = False):
-    buttons = [
-        [
-            InlineKeyboardButton("➕ Add to Group", url=f"https://t.me/{Var.BOT_USERNAME}?startgroup=start"),
-            InlineKeyboardButton("📣 Updates", url="https://t.me/EvaMaria"),
-        ],
-        [
-            InlineKeyboardButton("🔍 Inline Search", switch_inline_query_current_chat=""),
-            InlineKeyboardButton("❓ Help", callback_data="help"),
-        ],
-    ]
     if is_group:
-        buttons = [[InlineKeyboardButton("🔍 Search Files", switch_inline_query_current_chat="")]]
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Search Files", switch_inline_query_current_chat="")]
+        ])
+
+    buttons = []
+
+    # Row 1: "Add to Group" only if BOT_USERNAME is known (avoids ButtonUrlInvalid)
+    row1 = []
+    if Var.BOT_USERNAME:
+        row1.append(
+            InlineKeyboardButton("➕ Add to Group", url=f"https://t.me/{Var.BOT_USERNAME}?startgroup=start")
+        )
+    row1.append(InlineKeyboardButton("📣 Updates", url="https://t.me/EvaMaria"))
+    buttons.append(row1)
+
+    # Row 2
+    buttons.append([
+        InlineKeyboardButton("🔍 Inline Search", switch_inline_query_current_chat=""),
+        InlineKeyboardButton("❓ Help", callback_data="help"),
+    ])
+
     return InlineKeyboardMarkup(buttons)
+
 
 @Client.on_message(filters.command("start") & filters.private)
 async def start_pm(client: Client, message: Message):
     user = message.from_user
-    await add_user(user.id, user.first_name)
+    try:
+        await add_user(user.id, user.first_name)
+    except Exception as e:
+        logger.warning("add_user failed for %s: %s", user.id, e)
 
-    if await is_banned(user.id):
-        return await message.reply("🚫 You are banned from using this bot.")
+    try:
+        if await is_banned(user.id):
+            return await message.reply("🚫 You are banned from using this bot.")
+    except Exception as e:
+        logger.warning("is_banned check failed for %s: %s", user.id, e)
 
     # Handle deep-link payload
     if len(message.command) > 1:
         payload = message.command[1]
 
-        # Single file delivery: start_fileid
+        # Single file delivery: file_<id>
         if payload.startswith("file_"):
             file_id = payload[5:]
-            file_doc = await get_file(file_id)
+            try:
+                file_doc = await get_file(file_id)
+            except Exception as e:
+                logger.error("get_file failed: %s", e)
+                return await message.reply("❌ Could not retrieve file.")
             if file_doc:
                 try:
                     caption = Var.FILE_CAPTION.format(
@@ -113,6 +135,9 @@ async def start_pm(client: Client, message: Message):
                 except FloodWait as fw:
                     await asyncio.sleep(fw.value)
                     await client.send_cached_media(user.id, file_doc["file_id"])
+                except Exception as e:
+                    logger.error("send_cached_media failed: %s", e)
+                    await message.reply("❌ Could not send the file.")
             else:
                 await message.reply("❌ File not found or has been deleted.")
             return
@@ -128,9 +153,11 @@ async def start_pm(client: Client, message: Message):
                     fdoc = await get_file(fid)
                     if fdoc:
                         try:
-                            await client.send_cached_media(user.id, fdoc["file_id"],
-                                                           caption=fdoc.get("file_name", ""),
-                                                           protect_content=Var.PROTECT_CONTENT)
+                            await client.send_cached_media(
+                                user.id, fdoc["file_id"],
+                                caption=fdoc.get("file_name", ""),
+                                protect_content=Var.PROTECT_CONTENT,
+                            )
                             sent += 1
                             await asyncio.sleep(0.3)
                         except Exception:
@@ -145,25 +172,43 @@ async def start_pm(client: Client, message: Message):
     text = PRIVATE_START_TEXT.format(name=user.mention, bot_name=Var.BOT_NAME)
     kb = start_keyboard()
 
+    # Try with photo first, then plain text with keyboard, then plain text only.
+    # Each fallback drops one more thing that could cause a Telegram rejection.
+    if img_url:
+        try:
+            return await message.reply_photo(img_url, caption=text, reply_markup=kb)
+        except Exception as e:
+            logger.warning("reply_photo failed (%s), falling back to text", e)
+
     try:
-        if img_url:
-            await message.reply_photo(img_url, caption=text, reply_markup=kb)
-        else:
-            await message.reply(text, reply_markup=kb, disable_web_page_preview=True)
-    except Exception:
-        await message.reply(text, reply_markup=kb)
+        return await message.reply(text, reply_markup=kb, disable_web_page_preview=True)
+    except Exception as e:
+        logger.warning("reply with keyboard failed (%s), sending plain text", e)
+
+    # Last resort: no keyboard, no photo — guaranteed to work
+    await message.reply(text, disable_web_page_preview=True)
 
 
 @Client.on_message(filters.command("start") & filters.group)
 async def start_group(client: Client, message: Message):
     chat = message.chat
     user = message.from_user
-    await add_chat(chat.id, chat.title)
-    if user:
-        await add_user(user.id, user.first_name)
+    try:
+        await add_chat(chat.id, chat.title)
+        if user:
+            await add_user(user.id, user.first_name)
+    except Exception as e:
+        logger.warning("DB error in start_group: %s", e)
 
-    text = GROUP_START_TEXT.format(name=user.mention if user else "there", bot_username=Var.BOT_USERNAME)
-    await message.reply(text, reply_markup=start_keyboard(is_group=True), disable_web_page_preview=True)
+    text = GROUP_START_TEXT.format(
+        name=user.mention if user else "there",
+        bot_username=Var.BOT_USERNAME or "the bot",
+    )
+    try:
+        await message.reply(text, reply_markup=start_keyboard(is_group=True), disable_web_page_preview=True)
+    except Exception as e:
+        logger.warning("start_group reply failed (%s), sending plain text", e)
+        await message.reply(text, disable_web_page_preview=True)
 
 
 @Client.on_message(filters.command("help"))
@@ -192,6 +237,6 @@ async def start_cb(client, cb):
     kb = start_keyboard()
     try:
         await cb.message.edit(text, reply_markup=kb, disable_web_page_preview=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("start_cb edit failed: %s", e)
     await cb.answer()
