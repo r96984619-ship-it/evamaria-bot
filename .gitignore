@@ -1,0 +1,13 @@
+.env
+*.session
+*.session-journal
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+bot.log*
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
